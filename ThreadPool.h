@@ -1,6 +1,6 @@
 #pragma once
 
-#include <array>
+#include <cstdint>
 #include <queue>
 #include <thread>
 #include <mutex>
@@ -10,10 +10,9 @@
 #include <type_traits>
 #include <functional>
 
-template<std::size_t NumThreads>
 class ThreadPool {
 public:
-    ThreadPool();
+    ThreadPool(std::size_t numThreads);
     ~ThreadPool();
 
     template<class F, class... Args>
@@ -21,7 +20,7 @@ public:
         -> std::future<typename std::invoke_result<F, Args...>::type>;
 private:
     // need to keep track of threads so we can join them
-    std::array< std::thread, NumThreads > workers;
+    std::vector< std::thread > workers;
     // the task queue
     std::queue< std::packaged_task<void()> > tasks;
     
@@ -32,11 +31,11 @@ private:
 };
  
 // the constructor just launches some amount of workers
-template<std::size_t NumThreads>
-inline ThreadPool<NumThreads>::ThreadPool()
+inline ThreadPool::ThreadPool(std::size_t numThreads)
 {
-    for(size_t i = 0; i < NumThreads; ++i)
-        workers[i] = std::thread(
+    for(std::size_t i = 0; i < numThreads; ++i)
+    {
+        workers.emplace_back(
             [this]
             {
                 for(;;)
@@ -57,12 +56,12 @@ inline ThreadPool<NumThreads>::ThreadPool()
                 }
             }
         );
+    }
 }
 
 // add new work item to the pool
-template<std::size_t NumThreads>
 template<class F, class... Args>
-auto ThreadPool<NumThreads>::enqueue(F&& f, Args&&... args) 
+auto ThreadPool::enqueue(F&& f, Args&&... args) 
     -> std::future<typename std::invoke_result<F, Args...>::type>
 {
     using return_type = typename std::invoke_result<F, Args...>::type;
@@ -86,8 +85,7 @@ auto ThreadPool<NumThreads>::enqueue(F&& f, Args&&... args)
 }
 
 // the destructor joins all threads
-template<std::size_t NumThreads>
-inline ThreadPool<NumThreads>::~ThreadPool()
+inline ThreadPool::~ThreadPool()
 {
     {
         std::unique_lock<std::mutex> lock(queue_mutex);

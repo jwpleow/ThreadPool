@@ -7,7 +7,7 @@
 int main()
 {
     
-    ThreadPool<4> pool;
+    ThreadPool pool(4);
     std::vector< std::future<int> > results;
 
     for(int i = 0; i < 8; ++i) {
